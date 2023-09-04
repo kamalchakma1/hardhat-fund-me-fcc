@@ -15,8 +15,11 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         // we need to wait if on a live network so we can verify properly
         waitConfirmations: network.config.blockConfirmations || 1,
     })
-    
-    if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY) {
+
+    if (
+        !developmentChains.includes(network.name) &&
+        process.env.ETHERSCAN_API_KEY
+    ) {
         await verify(funWithStorage.address, [])
     }
 
@@ -50,6 +53,19 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
     // Can you write a function that finds the storage slot of the arrays and mappings?
     // And then find the data in those slots?
+    log("My Location is ...")
+    log(
+        `location of array is  :${await ethers.provider.getStorageAt(
+            funWithStorage.address,
+            2
+        )}`
+    )
+    log(
+        `location of mapping is : ${await ethers.provider.getStorageAt(
+            funWithStorage.address,
+            3
+        )}`
+    )
 }
 
 module.exports.tags = ["storage"]

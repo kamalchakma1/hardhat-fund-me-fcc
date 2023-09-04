@@ -84,17 +84,9 @@ const { developmentChains } = require("../../helper-hardhat-config")
                       endingDeployerBalance.add(gasCost).toString()
                   )
               })
-              // this test is overloaded. Ideally we'd split it into multiple tests
-              // but for simplicity we left it as one
-              it("is allows us to withdraw with multiple funders", async () => {
+
+              it("Cheaper withdraws ETH from a single funder", async () => {
                   // Arrange
-                  const accounts = await ethers.getSigners()
-                  for (i = 1; i < 6; i++) {
-                      const fundMeConnectedContract = await fundMe.connect(
-                          accounts[i]
-                      )
-                      await fundMeConnectedContract.fund({ value: sendValue })
-                  }
                   const startingFundMeBalance =
                       await fundMe.provider.getBalance(fundMe.address)
                   const startingDeployerBalance =
@@ -102,30 +94,71 @@ const { developmentChains } = require("../../helper-hardhat-config")
 
                   // Act
                   const transactionResponse = await fundMe.cheaperWithdraw()
-                  // Let's comapre gas costs :)
-                  // const transactionResponse = await fundMe.withdraw()
                   const transactionReceipt = await transactionResponse.wait()
                   const { gasUsed, effectiveGasPrice } = transactionReceipt
-                  const withdrawGasCost = gasUsed.mul(effectiveGasPrice)
-                  console.log(`GasCost: ${withdrawGasCost}`)
-                  console.log(`GasUsed: ${gasUsed}`)
-                  console.log(`GasPrice: ${effectiveGasPrice}`)
+                  const gasCost = gasUsed.mul(effectiveGasPrice)
+
                   const endingFundMeBalance = await fundMe.provider.getBalance(
                       fundMe.address
                   )
                   const endingDeployerBalance =
                       await fundMe.provider.getBalance(deployer)
+
                   // Assert
+                  // Maybe clean up to understand the testing
+                  assert.equal(endingFundMeBalance, 0)
                   assert.equal(
                       startingFundMeBalance
                           .add(startingDeployerBalance)
                           .toString(),
-                      endingDeployerBalance.add(withdrawGasCost).toString()
+                      endingDeployerBalance.add(gasCost).toString()
                   )
-                  // Make a getter for storage variables
+              })
+
+              // this test is overloaded. Ideally we'd split it into multiple tests
+              // but for simplicity we left it as one
+
+              it("is allows us to withdraw with multiple funders", async function () {
+                  const accounts = await ethers.getSigners()
+
+                  // Connecting fundMe with each accounts
+                  for (let i = 1; i < 6; i++) {
+                      const fundMeConnectedContract = await fundMe.connect(
+                          accounts[i]
+                      )
+                      fundMeConnectedContract.fund({ value: sendValue })
+                  }
+                  // Arrange
+                  const startingFundMeBalance =
+                      await ethers.provider.getBalance(fundMe.address)
+                  const startingDeployerBalance =
+                      await ethers.provider.getBalance(deployer)
+
+                  // Acting
+                  const transactionResponse = await fundMe.withdraw()
+                  const transactionReceipt = await transactionResponse.wait()
+
+                  const { gasUsed, effectiveGasPrice } = transactionReceipt
+                  const gasCost = gasUsed.mul(effectiveGasPrice)
+
+                  // assert
+                  const endingFundMeBalance = await ethers.provider.getBalance(
+                      fundMe.address
+                  )
+                  const endingDeployerBalance =
+                      await ethers.provider.getBalance(deployer)
+
+                  assert.equal(endingFundMeBalance, 0)
+                  assert.equal(
+                      startingFundMeBalance
+                          .add(startingDeployerBalance)
+                          .toString(),
+                      endingDeployerBalance.add(gasCost).toString()
+                  )
+
                   await expect(fundMe.getFunder(0)).to.be.reverted
 
-                  for (i = 1; i < 6; i++) {
+                  for (let i = 1; i < 6; i++) {
                       assert.equal(
                           await fundMe.getAddressToAmountFunded(
                               accounts[i].address
@@ -134,14 +167,67 @@ const { developmentChains } = require("../../helper-hardhat-config")
                       )
                   }
               })
-              it("Only allows the owner to withdraw", async function () {
+
+              // Checking only owner can withdraw not others
+              it("only allows the owner to withdraw", async function () {
                   const accounts = await ethers.getSigners()
-                  const fundMeConnectedContract = await fundMe.connect(
-                      accounts[1]
+                  const attacker = accounts[1]
+                  const attackerConnectedContract = await fundMe.connect(
+                      attacker
                   )
                   await expect(
-                      fundMeConnectedContract.withdraw()
+                      attackerConnectedContract.withdraw()
                   ).to.be.revertedWith("FundMe__NotOwner")
+              })
+
+              it("Cheaper Withdraw Testing...", async function () {
+                  const accounts = await ethers.getSigners()
+
+                  // Connecting fundMe with each accounts
+                  for (let i = 1; i < 6; i++) {
+                      const fundMeConnectedContract = await fundMe.connect(
+                          accounts[i]
+                      )
+                      fundMeConnectedContract.fund({ value: sendValue })
+                  }
+                  // Arrange
+                  const startingFundMeBalance =
+                      await ethers.provider.getBalance(fundMe.address)
+                  const startingDeployerBalance =
+                      await ethers.provider.getBalance(deployer)
+
+                  // Acting
+                  const transactionResponse = await fundMe.cheaperWithdraw()
+                  const transactionReceipt = await transactionResponse.wait()
+
+                  const { gasUsed, effectiveGasPrice } = transactionReceipt
+                  const gasCost = gasUsed.mul(effectiveGasPrice)
+
+                  // assert
+                  const endingFundMeBalance = await ethers.provider.getBalance(
+                      fundMe.address
+                  )
+                  const endingDeployerBalance =
+                      await ethers.provider.getBalance(deployer)
+
+                  assert.equal(endingFundMeBalance, 0)
+                  assert.equal(
+                      startingFundMeBalance
+                          .add(startingDeployerBalance)
+                          .toString(),
+                      endingDeployerBalance.add(gasCost).toString()
+                  )
+
+                  await expect(fundMe.getFunder(0)).to.be.reverted
+
+                  for (let i = 1; i < 6; i++) {
+                      assert.equal(
+                          await fundMe.getAddressToAmountFunded(
+                              accounts[i].address
+                          ),
+                          0
+                      )
+                  }
               })
           })
       })
